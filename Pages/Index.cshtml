@@ -1,0 +1,91 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Home page";
+}
+
+<div class="p-3">
+    Chat with fiends as
+    <input type="text" id="userInput" placeholder="Your name" disabled="disabled"/>
+</div>
+
+<label>
+    select conversation
+    <select id="receiver">
+        <option value="0"> All Connected</option>
+    </select>
+</label>
+<hr/>
+
+<div id="messagesList" class=" p-1 rounded" style="text-align: left; direction: ltr"></div>
+
+<br/>
+<div style="background: #d1d1d1;" class="p-2">
+    <div class="row">
+        <div class="col-10">
+            <input type="text" style="border: 1px solid #4b4b4b;" id="messageInput" placeholder="Your message" class="rounded w-100"/>
+        </div>
+        <div class="col-2">
+            <button id="sendButton" class="btn btn-success">Send</button>
+        </div>
+    </div>
+</div>
+
+@section Scripts
+{
+    <script>
+        let yourConnectionObject = null;
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl("/chat")
+            .build();
+
+        connection.start()
+            .catch(err => console.error(err.toString()));
+
+
+
+        document.getElementById("sendButton").addEventListener("click", () => {
+            const user = document.getElementById("userInput").value;
+            const message = document.getElementById("messageInput").value;
+            const receiverId = document.getElementById("receiver").value;
+            document.getElementById("messageInput").value = "";
+            connection.invoke("SendMessage", user, message, receiverId).catch(err => console.error(err.toString()));
+        });
+        
+        
+        connection.on("ReceiveMessage", (user, message, isPv, senderConnectionId) => {
+            let msgContainerStyle = "";
+            
+            if (yourConnectionObject.ConnectionId !== senderConnectionId)
+            {
+                    msgContainerStyle = "bg-info";
+                }
+                else
+                    user = "You: "
+
+
+            let msgContainer = "<div style='box-shadow: 1px 2px 2px #cccccc' class='p-1 rounded mb-1"+msgContainerStyle+"'>";
+            msgContainer += "<span>"+user+": </span><br/>";
+            msgContainer += "<p>"+message+"</p>";
+            msgContainer += "</div>";
+            
+            document.getElementById("messagesList").innerHTML += msgContainer;
+        });
+
+        connection.on("UpdateConnectedUsers", (users) => {
+            let receivedUsers = JSON.parse(users)
+            $('#receiver').find('option:not(:first)').remove();
+            receivedUsers.forEach(connection=>{
+                $("#receiver").append("<option value='"+connection.ConnectionId+"'>"+connection.UserName+"</option>")
+            });
+        });
+        
+        connection.on("ReceiveConnectionInfo", (connectionInfo) => {
+            let receivedUsers = JSON.parse(connectionInfo)
+            yourConnectionObject = receivedUsers;
+            $("#userInput").val(receivedUsers.UserName)
+        });
+        
+    
+    </script>
+}
